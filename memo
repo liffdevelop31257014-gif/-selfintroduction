@@ -1,0 +1,336 @@
+はい、この場合はいきなりコードを修正するよりも、**どこで失敗しているのか切り分ける**のが一番早いです。
+
+現状考えられる原因は大きく4つです。
+
+1. app.jsからGASへのPOSTができていない
+2. code.gsでエラーになっている
+3. スプレッドシートへのアクセスでエラーになっている
+4. app.jsがGASからの返却を正常に受け取れていない
+
+---
+
+## ① まずChromeの開発者ツールで確認
+
+送信ボタンを押したあと
+
+```
+F12
+↓
+Network
+↓
+Fetch/XHR
+```
+
+を開いたまま送信してください。
+
+`exec`へのPOSTが1件出るはずです。
+
+それをクリックして
+
+### Status
+
+```
+200
+```
+
+ならGASまでは届いています。
+
+もし
+
+```
+403
+404
+500
+```
+
+ならその時点で原因がかなり絞れます。
+
+---
+
+### Responseタブ
+
+ここが一番重要です。
+
+例えば
+
+```
+{
+  "ok": false,
+  "reason": "invalid_params"
+}
+```
+
+なら
+
+app.js側の送信内容がおかしいです。
+
+---
+
+もし
+
+```
+{
+  "ok": false,
+  "reason": "server_error",
+  "message":"..."
+}
+```
+
+なら
+
+code.gs内部で例外が起きています。
+
+---
+
+## ② Apps Script の実行ログ
+
+Apps Scriptを開いて
+
+```
+実行
+↓
+実行数
+```
+
+を見てください。
+
+送信した時刻に
+
+```
+doPost
+```
+
+が実行されていますか？
+
+### 実行されていない
+
+→ app.jsからPOSTできていません。
+
+---
+
+### 実行されている
+
+→ code.gsまでは届いています。
+
+---
+
+## ③ code.gsにログを追加
+
+`doPost()`を一時的に
+
+```javascript
+function doPost(e) {
+  try {
+
+    console.log(e.postData.contents);
+
+    var body = JSON.parse(e.postData.contents);
+
+    console.log(body);
+
+    if(body.action==="share"){
+      return handleShare(body);
+    }
+
+    return jsonResponse({
+      ok:false,
+      reason:"invalid_action"
+    });
+
+  } catch(err){
+
+    console.log(err);
+
+    return jsonResponse({
+      ok:false,
+      reason:"server_error",
+      message:String(err)
+    });
+
+  }
+}
+```
+
+としてください。
+
+すると
+
+```
+実行
+↓
+
+ログ
+```
+
+で
+
+```
+body.id
+
+body.ownerHash
+
+body.cipherText
+```
+
+がちゃんと来ているか確認できます。
+
+---
+
+## ④ スプレッドシート接続確認
+
+Apps Scriptで
+
+```javascript
+function testSheet(){
+
+  var sheet = getSheet();
+
+  Logger.log(sheet.getName());
+
+}
+```
+
+を実行してください。
+
+もし
+
+```
+sheet
+```
+
+と出れば
+
+✔ SpreadsheetID
+
+✔ シート名
+
+は正しいです。
+
+もし
+
+```
+Cannot call getName of null
+```
+
+なら
+
+```
+SHEET_NAME='sheet'
+```
+
+が違います。
+
+---
+
+もし
+
+```
+Exception:
+You do not have permission
+```
+
+なら
+
+SpreadsheetIDか権限です。
+
+---
+
+## ⑤ appendRowだけ確認
+
+さらに
+
+```javascript
+function testAppend(){
+
+  var sheet=getSheet();
+
+  sheet.appendRow([
+    "test",
+    "abc",
+    "",
+    "owner",
+    "",
+    "active",
+    1,
+    new Date(),
+    new Date(),
+    "",
+    "",
+    0
+  ]);
+
+}
+```
+
+これを実行してください。
+
+成功するなら
+
+スプレッドシート接続は問題ありません。
+
+---
+
+## ⑥ app.js側にもログを追加
+
+送信処理の
+
+```javascript
+fetch(GAS_ENDPOINT,{
+```
+
+の直前に
+
+```javascript
+console.log(payload);
+```
+
+そして
+
+```javascript
+const res=await fetch(...);
+
+console.log(res);
+
+const json=await res.json();
+
+console.log(json);
+```
+
+を追加してください。
+
+これで
+
+* payloadが送れているか
+* GASから何が返ってきているか
+
+が分かります。
+
+---
+
+## 私が最初に疑っている箇所
+
+添付いただいた `code.gs` を見る限り、`handleShare()` は
+
+```javascript
+if (!id || !cipherText || !ownerHash) {
+  return jsonResponse({
+    ok:false,
+    reason:"invalid_params"
+  });
+}
+```
+
+となっています。
+
+つまり、**`id`・`cipherText`・`ownerHash` のどれか1つでも送られていないと失敗**します。
+
+---
+
+### 一番知りたいもの
+
+原因は数分で特定できると思いますので、次の2点を見せていただければ「app.jsなのかGASなのか」をほぼ断定できます。
+
+1. **app.js の送信処理（`fetch(GAS_ENDPOINT, ...)` の前後約50行）**
+2. **ブラウザの開発者ツール（Network → exec → Response）の内容**
+
+この2つがあれば、どこで失敗しているかを具体的に特定します。
