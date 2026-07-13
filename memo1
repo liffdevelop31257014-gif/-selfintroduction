@@ -1,0 +1,10 @@
+Failed to load resource: the server responded with a status of 400 ()
+app.js:1209 友だち確認をスキップ: Error: There is no login bot linked to this channel.
+    at new t (sdk.js:1:20425)
+    at Pe (sdk.js:1:20531)
+    at sdk.js:1:44346
+    at sdk.js:1:13359
+    at Object.next (sdk.js:1:13464)
+    at a (sdk.js:1:12206)
+checkFriendship @ app.js:1209
+app.js:1073 share error 
