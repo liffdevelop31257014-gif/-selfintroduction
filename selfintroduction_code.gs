@@ -34,6 +34,48 @@ var COL = {
 
 var DATA_START_ROW = 2; // 1行目=見出し, 2行目以降がデータ
 
+/* ------------------------------------------------------------
+   真剣交際パートナー機能連携（Partners中央API）
+   ・このアプリにはAnalyticsシートが無いため、handleView側の
+     アクセス制御のみ対応する（Analytics同期は不要）。
+   ------------------------------------------------------------ */
+var PARTNERS_ENDPOINT = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXX/exec'; // ← Partners用GASの/exec URLを設定
+var INTERNAL_SECRET    = PropertiesService.getScriptProperties().getProperty('INTERNAL_SECRET') || '';
+
+/* 指定ownerHashの現在の真剣交際ステータスをPartners APIに問い合わせる。
+   ・ active: true  → viewerHash が partnerHash と一致する場合のみ閲覧許可
+   ・ everPartnered: true（かつ active:false）→ 過去に交際していたが現在は
+     パートナー不在（交際終了後など）。本人以外は誰にも見せない。
+   ・ 両方 false → 従来通り「初回閲覧者固定」ロジックを使う
+   結果は120秒キャッシュし、Partners API不通時は「everPartnered:false」
+   として従来ロジックにフォールバックする（閲覧を過剰にブロックしないため）。 */
+function getPartnerStatus(ownerHash) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'partner_' + ownerHash;
+  var cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  var result = { active: false, everPartnered: false, partnerHash: '' };
+  try {
+    var url = PARTNERS_ENDPOINT + '?action=status'
+      + '&ownerHash=' + encodeURIComponent(ownerHash)
+      + '&secret=' + encodeURIComponent(INTERNAL_SECRET);
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var body = JSON.parse(res.getContentText());
+    if (body.ok) {
+      result = {
+        active: !!body.active,
+        everPartnered: !!body.everPartnered,
+        partnerHash: body.partnerHash || ''
+      };
+    }
+  } catch (err) {
+    Logger.log('getPartnerStatus failed: ' + err);
+  }
+  cache.put(cacheKey, JSON.stringify(result), 120);
+  return result;
+}
+
 
 /* ------------------------------------------------------------
    エントリポイント
@@ -188,9 +230,14 @@ function handleView(id, viewerHash) {
 
     var now = new Date();
     var allowed = false;
+    var partnerInfo = getPartnerStatus(ownerHash);
 
     if (viewerHash === ownerHash) {
       allowed = true;
+    } else if (partnerInfo.active) {
+      allowed = (viewerHash === partnerInfo.partnerHash);
+    } else if (partnerInfo.everPartnered) {
+      allowed = false;
     } else if (!existingViewerHash) {
       allowed = true;
       sheet.getRange(rowIndex, COL.VIEWER_HASH).setValue(viewerHash);
@@ -201,7 +248,9 @@ function handleView(id, viewerHash) {
       allowed = false;
     }
 
-    if (!allowed) return jsonResponse({ ok: false, reason: 'forbidden' });
+    if (!allowed) {
+      return jsonResponse({ ok: false, reason: (partnerInfo.active || partnerInfo.everPartnered) ? 'partner_locked' : 'forbidden' });
+    }
 
     sheet.getRange(rowIndex, COL.LAST_VIEWED_AT).setValue(now);
     var viewCountCell = sheet.getRange(rowIndex, COL.VIEW_COUNT);
