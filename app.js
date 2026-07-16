@@ -1143,7 +1143,7 @@ function bindEvents(){
      画像は1MB以下を推奨。PNGの透過部分はそのまま送ると
      反映されない場合があるため、白背景に合成したJPEGを使用する。
    ============================================================ */
-const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-selfintroduction/image_message.jpg";
+const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-selfintroduction-/image_message.jpg";
 
 function buildShareFlexMessage(name, shareURL){
   const nameLine = name ? `${name}さんの婚活プロフィールが届きました` : "回答が届きました";
