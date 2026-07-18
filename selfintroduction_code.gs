@@ -39,7 +39,7 @@ var DATA_START_ROW = 2; // 1行目=見出し, 2行目以降がデータ
    ・このアプリにはAnalyticsシートが無いため、handleView側の
      アクセス制御のみ対応する（Analytics同期は不要）。
    ------------------------------------------------------------ */
-var PARTNERS_ENDPOINT = 'https://script.google.com/macros/s/XXXXXXXXXXXXXXXX/exec'; // ← Partners用GASの/exec URLを設定
+var PARTNERS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzqT-qmVRh_jI04stlgYiWCypqWHjWkGv-0pNGkpvUt3c8FGQzQG_FBF7eWeb3frcDk/exec'; // ← Partners用GASの/exec URLを設定
 var INTERNAL_SECRET    = PropertiesService.getScriptProperties().getProperty('INTERNAL_SECRET') || '';
 
 /* 指定ownerHashの現在の真剣交際ステータスをPartners APIに問い合わせる。
