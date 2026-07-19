@@ -63,7 +63,7 @@
 
       <!-- 自分史サブパネル -->
       <div id="sub-story" class="sub-panel">
-        <p class="drag-hint">カード左上の「≡」を長押しすると、ドラッグして並び順を入れ替えられます。</p>
+        <p class="drag-hint">カード左上の「▲▼」ボタンで、並び順を入れ替えられます。</p>
         <div class="profile-card" id="profileCard">
           <p class="profile-card-label">プロフィール基本情報</p>
           <div class="profile-row">
@@ -215,7 +215,10 @@
 <template id="cardTemplate">
   <div class="life-card">
     <div class="life-card-header">
-      <button class="drag-handle" type="button" aria-label="並び替え">≡</button>
+      <div class="move-buttons">
+        <button class="move-up" type="button" aria-label="上に移動">▲</button>
+        <button class="move-down" type="button" aria-label="下に移動">▼</button>
+      </div>
       <select class="card-category"></select>
       <button class="delete-card" type="button" aria-label="カードを削除">×</button>
     </div>

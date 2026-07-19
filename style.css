@@ -128,15 +128,20 @@ textarea{ min-height:72px; resize:vertical; line-height:1.6; }
    ============================================================ */
 .card-list{ display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
 .life-card{ background:var(--white); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); overflow:hidden; }
-.life-card.dragging{ transform:scale(1.03); box-shadow:var(--shadow-float); opacity:.85; }
 .life-card-header{
   display:flex; align-items:center; gap:10px; padding:10px 12px;
   border-bottom:1px solid var(--pink-soft);
 }
-.drag-handle{
-  flex:0 0 auto; width:34px; height:34px; border:none; background:transparent;
-  color:var(--ink-soft); font-size:20px; line-height:1; cursor:grab; touch-action:none;
+.move-buttons{
+  flex:0 0 auto; display:flex; flex-direction:column; gap:2px;
 }
+.move-up,.move-down{
+  width:30px; height:20px; border:none; border-radius:6px; background:var(--pink-soft);
+  color:var(--pink-deep); font-size:11px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.move-up:active,.move-down:active{ opacity:.8; }
+.move-up:disabled,.move-down:disabled{ opacity:.3; cursor:default; }
 .card-category{ flex:1; border:none; background:transparent; font-size:16px; font-weight:700; color:var(--pink-deep); padding:6px 8px; }
 .delete-card{ flex:0 0 auto; width:32px; height:32px; border:none; background:transparent; color:#cc6b78; font-size:20px; line-height:1; cursor:pointer; }
 .card-body{ padding:14px 16px 4px; }
@@ -241,12 +246,17 @@ textarea{ min-height:72px; resize:vertical; line-height:1.6; }
   border-bottom:1px solid #faf0f2;
 }
 .sched-slot:last-child{ border-bottom:none; }
-.sched-slot.dragging{ background:#fff8f9; box-shadow:var(--shadow-float); opacity:.85; border-radius:var(--radius-sm); }
 
-.sched-slot-drag{
-  flex:0 0 auto; width:28px; height:28px; border:none; background:transparent;
-  color:var(--ink-soft); font-size:18px; line-height:1; cursor:grab; touch-action:none;
+.sched-slot .move-buttons{
+  flex:0 0 auto; display:flex; flex-direction:column; gap:2px;
 }
+.sched-slot .move-up,.sched-slot .move-down{
+  width:26px; height:18px; border:none; border-radius:5px; background:var(--pink-soft);
+  color:var(--pink-deep); font-size:10px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.sched-slot .move-up:active,.sched-slot .move-down:active{ opacity:.8; }
+.sched-slot .move-up:disabled,.sched-slot .move-down:disabled{ opacity:.3; cursor:default; }
 .sched-slot-content{ flex:1; min-width:0; }
 .sched-slot-times{ display:flex; align-items:center; gap:4px; margin-bottom:5px; }
 .sched-slot-times input[type="time"]{

@@ -236,10 +236,39 @@ function renderCard(cardData){
   [eYr,eAg].forEach(el=>el.addEventListener("blur",()=>{ syncYearAgePair(eYr,eAg); saveDraft(); }));
   node.querySelector(".delete-card").addEventListener("click",()=>{
     if(!confirm("このカードを削除しますか？")) return;
-    node.remove(); saveDraft();
+    const list=node.parentElement;
+    node.remove();
+    if(list) updateMoveButtons(list);
+    saveDraft();
   });
-  document.getElementById("cardList").appendChild(node);
+  node.querySelector(".move-up").addEventListener("click",()=>{
+    const list=node.parentElement, prev=node.previousElementSibling;
+    if(!prev) return;
+    list.insertBefore(node,prev);
+    updateMoveButtons(list); saveDraft();
+  });
+  node.querySelector(".move-down").addEventListener("click",()=>{
+    const list=node.parentElement, next=node.nextElementSibling;
+    if(!next) return;
+    list.insertBefore(next,node);
+    updateMoveButtons(list); saveDraft();
+  });
+  const cardList=document.getElementById("cardList");
+  cardList.appendChild(node);
+  updateMoveButtons(cardList);
   return node;
+}
+
+/* 一覧内での並び替えボタン（▲▼）の有効/無効状態を更新する
+   （先頭要素は上へ、末尾要素は下へ移動できないためボタンを無効化） */
+function updateMoveButtons(container){
+  const items=[...container.children];
+  items.forEach((item,i)=>{
+    const upBtn=item.querySelector(".move-up");
+    const downBtn=item.querySelector(".move-down");
+    if(upBtn)   upBtn.disabled  = (i===0);
+    if(downBtn) downBtn.disabled= (i===items.length-1);
+  });
 }
 
 const DEFAULT_STARTER_RANGES={
@@ -263,44 +292,6 @@ function addStarterCards(){
   saveDraft();
 }
 
-/* ---- ドラッグ並び替え（自分史カード） ---- */
-function setupDragReorder(){
-  const list=document.getElementById("cardList");
-  let dragCard=null,ptId=null,lastY=0;
-  function onMove(e){
-    if(!dragCard) return;
-    dragCard.style.transform=`translateY(${e.clientY-lastY}px) scale(1.03)`;
-    const cy=dragCard.getBoundingClientRect();
-    const c=cy.top+cy.height/2;
-    for(const s of [...list.children].filter(n=>n!==dragCard)){
-      const sr=s.getBoundingClientRect();
-      if(c>sr.top&&c<sr.bottom){
-        list.insertBefore(dragCard,c<sr.top+sr.height/2?s:s.nextElementSibling);
-        lastY=e.clientY; dragCard.style.transform="translateY(0) scale(1.03)"; break;
-      }
-    }
-  }
-  function onUp(){
-    if(!dragCard) return;
-    try{ dragCard.querySelector(".drag-handle").releasePointerCapture(ptId); }catch(_){}
-    dragCard.classList.remove("dragging"); dragCard.style.transform=""; dragCard.style.zIndex="";
-    list.removeEventListener("pointermove",onMove);
-    list.removeEventListener("pointerup",onUp);
-    list.removeEventListener("pointercancel",onUp);
-    dragCard=null; saveDraft();
-  }
-  list.addEventListener("pointerdown",e=>{
-    const h=e.target.closest(".drag-handle"); if(!h) return;
-    const c=h.closest(".life-card"); if(!c) return;
-    e.preventDefault();
-    dragCard=c; ptId=e.pointerId; lastY=e.clientY;
-    c.classList.add("dragging"); c.style.zIndex="50"; h.setPointerCapture(ptId);
-    list.addEventListener("pointermove",onMove);
-    list.addEventListener("pointerup",onUp);
-    list.addEventListener("pointercancel",onUp);
-  });
-}
-
 /* ============================================================
    スケジュール（入力UI）
    ============================================================ */
@@ -312,11 +303,14 @@ function createSlot(o={}){
 }
 
 /* スロットDOMを1行分生成して返す */
-function buildSlotEl(slot){
+function buildSlotEl(slot,patternId){
   const div=document.createElement("div");
   div.className="sched-slot"; div.dataset.slotid=slot.id;
   div.innerHTML=`
-    <button class="sched-slot-drag" type="button">≡</button>
+    <div class="move-buttons">
+      <button class="move-up" type="button" aria-label="上に移動">▲</button>
+      <button class="move-down" type="button" aria-label="下に移動">▼</button>
+    </div>
     <div class="sched-slot-content">
       <div class="sched-slot-times">
         <input type="time" class="sched-slot-start" value="${escapeHTML(slot.startTime||"")}">
@@ -333,51 +327,35 @@ function buildSlotEl(slot){
   div.querySelector(".sched-slot-delete").addEventListener("click",()=>{
     const p=schedulePatterns.find(p=>p.slots.some(s=>s.id===slot.id)); if(!p) return;
     if(!confirm("この時間帯を削除しますか？")) return;
-    p.slots=p.slots.filter(s=>s.id!==slot.id); div.remove(); saveDraft();
+    const list=div.parentElement;
+    p.slots=p.slots.filter(s=>s.id!==slot.id); div.remove();
+    if(list) updateMoveButtons(list);
+    saveDraft();
+  });
+  div.querySelector(".move-up").addEventListener("click",()=>{
+    const list=div.parentElement, prev=div.previousElementSibling;
+    if(!prev) return;
+    list.insertBefore(div,prev);
+    reorderSlots(list,patternId);
+  });
+  div.querySelector(".move-down").addEventListener("click",()=>{
+    const list=div.parentElement, next=div.nextElementSibling;
+    if(!next) return;
+    list.insertBefore(next,div);
+    reorderSlots(list,patternId);
   });
   return div;
 }
 
-/* スロットリストのドラッグ並び替え */
-function setupSlotDrag(listEl,patternId){
-  if(!listEl) return;
-  let drag=null,ptId=null,lastY=0;
-  function onMove(e){
-    if(!drag) return;
-    drag.style.transform=`translateY(${e.clientY-lastY}px)`;
-    const c=drag.getBoundingClientRect(); const cy=c.top+c.height/2;
-    for(const s of [...listEl.children].filter(n=>n!==drag)){
-      const sr=s.getBoundingClientRect();
-      if(cy>sr.top&&cy<sr.bottom){
-        listEl.insertBefore(drag,cy<sr.top+sr.height/2?s:s.nextElementSibling);
-        lastY=e.clientY; drag.style.transform=""; break;
-      }
-    }
+/* スロットの並び替えボタン操作後、DOM順序をデータへ反映しボタン状態を更新する */
+function reorderSlots(listEl,patternId){
+  const p=schedulePatterns.find(p=>p.id===patternId);
+  if(p){
+    const order=[...listEl.querySelectorAll(".sched-slot")].map(el=>el.dataset.slotid);
+    p.slots.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
   }
-  function onUp(){
-    if(!drag) return;
-    try{ drag.querySelector(".sched-slot-drag").releasePointerCapture(ptId); }catch(_){}
-    drag.classList.remove("dragging"); drag.style.transform=""; drag.style.zIndex="";
-    listEl.removeEventListener("pointermove",onMove);
-    listEl.removeEventListener("pointerup",onUp);
-    listEl.removeEventListener("pointercancel",onUp);
-    /* 並び順をデータに反映 */
-    const p=schedulePatterns.find(p=>p.id===patternId); if(p){
-      const order=[...listEl.querySelectorAll(".sched-slot")].map(el=>el.dataset.slotid);
-      p.slots.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
-    }
-    drag=null; saveDraft();
-  }
-  listEl.addEventListener("pointerdown",e=>{
-    const h=e.target.closest(".sched-slot-drag"); if(!h) return;
-    const s=h.closest(".sched-slot"); if(!s) return;
-    e.preventDefault();
-    drag=s; ptId=e.pointerId; lastY=e.clientY;
-    s.classList.add("dragging"); s.style.zIndex="50"; h.setPointerCapture(ptId);
-    listEl.addEventListener("pointermove",onMove);
-    listEl.addEventListener("pointerup",onUp);
-    listEl.addEventListener("pointercancel",onUp);
-  });
+  updateMoveButtons(listEl);
+  saveDraft();
 }
 
 /* アクティブパターン編集エリアを再描画 */
@@ -400,12 +378,13 @@ function renderActivePatternEditor(){
     </div>`;
 
   const listEl=el.querySelector(`#slotList-${p.id}`);
-  p.slots.forEach(s=>listEl.appendChild(buildSlotEl(s)));
-  setupSlotDrag(listEl,p.id);
+  p.slots.forEach(s=>listEl.appendChild(buildSlotEl(s,p.id)));
+  updateMoveButtons(listEl);
 
   el.querySelector(".sched-add-slot-btn").addEventListener("click",()=>{
     const slot=createSlot(); p.slots.push(slot);
-    listEl.appendChild(buildSlotEl(slot)); saveDraft();
+    listEl.appendChild(buildSlotEl(slot,p.id));
+    updateMoveButtons(listEl); saveDraft();
   });
 
   el.querySelector(".sched-pattern-menu-btn").addEventListener("click",()=>{
@@ -1128,7 +1107,6 @@ function bindEvents(){
     location.href=getFormBaseURL();
   });
 
-  setupDragReorder();
 }
 
 /* ============================================================
